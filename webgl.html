@@ -10,14 +10,14 @@
 	
 	<body>
 		
-		<script id = "VERTEX_SHADER_CODE" type = "vertex-glsl">
+		<script id = "VSHADER_CODE" type = "vertex-glsl">
 			attribute vec2 coordinates;
 			void main(void){
 				gl_Position = vec4(coordinates, 0.0, 1.0);
 			}
 		</script>
 		
-		<script id = "FRAGMENT_SHADER_CODE" type = "fragment-glsl">
+		<script id = "FSHADER_CODE" type = "fragment-glsl">
 			void main(void){
 				gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0);
 			}
@@ -49,6 +49,14 @@
 				//Unbind the buffer
 				gl.bindBuffer(gl.ARRAY_BUFFER, null);
 				return VBO;
+			}
+			
+			function createIBO(gl, indices){
+				var IBO = gl.createBuffer();
+				gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, IBO);
+				gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(indices), gl.STATIC_DRAW);
+				gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null);
+				return IBO;
 			}
 			
 			/*  Gets the shader code, links to a shader type and compile */
@@ -85,9 +93,9 @@
 			/*  Create and Compile shader programs */
 			function startShaders(gl){
 				
-				var vertShader = getShader(gl, "VERTEX_SHADER_CODE");
+				var vertShader = getShader(gl, "VSHADER_CODE");
 
-				var fragShader = getShader(gl, "FRAGMENT_SHADER_CODE");
+				var fragShader = getShader(gl, "FSHADER_CODE");
 				
 				//Create a shader program object to store combined shader program
 				var shaderProgram = gl.createProgram();
@@ -104,9 +112,11 @@
 			}
 			
 			/*  Associate the shader programs to buffer objects */
-			function associate(gl,VBO,shaderProgram){
+			function associate(gl,VBO,IBO,shaderProgram){
 				//Bind vertex buffer object
 				gl.bindBuffer(gl.ARRAY_BUFFER, VBO);
+				//Bind index buffer object
+				gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, IBO);
 				//Get the attribute location
 				var coord = gl.getAttribLocation(shaderProgram, "coordinates");
 				//Point an attribute to the currently bound VBO
@@ -116,35 +126,39 @@
 			}
 			
 			/*  Draws the object */
-			function draw(gl,canvas){
+			function draw(gl,canvas,indices){
 				//Clear the canvas
 				gl.clearColor(0.5,0.5,0.5,1.0);
 				//Enable the depth test
 				gl.enable(gl.DEPTH_TEST);
 				//Clear the color buffer bit
-				gl.clear(gl.COLOR_BUFFER_BIT);
+				gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 				//Set the viewport
 				gl.viewport(0, 0, canvas.width, canvas.height);
 				//Draw the triangle
-				gl.drawArrays(gl.TRIANGLES, 0, 3);
+				gl.drawElements(gl.TRIANGLES, indices.length, gl.UNSIGNED_SHORT, 0);
 			}
 			
-			function render(gl,VBO,shaderProgram,canvas){
-				associate(gl,VBO,shaderProgram);
-				draw(gl,canvas);
+			function render(gl,VBO,IBO,indices,shaderProgram,canvas){
+				associate(gl,VBO,IBO,shaderProgram);
+				draw(gl,canvas,indices);
 			}
 			
 			var canvas = getCanvas('mycanvas');
 			
 			var gl = prepare(canvas, 'experimental-webgl');
 			
-			var vertices = [0.1,-0.1, -0.1,-0.1, 0.0,0.2];
+			var vertices = [0.9,-0.9, -0.9,-0.9, 0.0,0.9];
 			
 			var VBO = createVBO(gl, vertices);
 			
+			var indices = [0, 1, 2];
+			
+			var IBO = createIBO(gl, indices);
+			
 			var shaderProgram = startShaders(gl);
 			
-			render(gl,VBO,shaderProgram,canvas);
+			render(gl,VBO,IBO,indices,shaderProgram,canvas);
 			
 		</script>
 		
