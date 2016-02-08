@@ -1,0 +1,24 @@
+{
+  "name": "web-gl",
+  "version": "1.0.0",
+  "description": "Testing web-gl",
+  "main": "index.js",
+  "scripts": {
+		"build": "babel src -d build"
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/0000marcell/WebGL.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/0000marcell/WebGL/issues"
+  },
+  "homepage": "https://github.com/0000marcell/WebGL#readme",
+  "devDependencies": {
+    "babel-cli": "^6.5.0",
+    "qunit-cli": "^0.2.0"
+  }
+}
