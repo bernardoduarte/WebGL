@@ -35,7 +35,7 @@
 		
 		<canvas width = "500" height = "500" id = 'mycanvas'></canvas>
 		
-		<script language = "javascript">
+		<script type = "text/javascript">
 			
 			
 			/*  Gets the canvas */
@@ -93,7 +93,7 @@
 				gl.compileShader(shader);
 				
 				if(!gl.getShaderParameter(shader, gl.COMPILE_STATUS)){
-					alert(gl.shaderInfoLog(shader));
+					alert(gl.getShaderInfoLog(shader));
 					return null;
 				}
 				

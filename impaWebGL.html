@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<title>ImpaWebGL</title>
+		<script id="WebGL"type="text/javascript">
+			var mygl = {};//My GL functions and attributes
+			var gl = {};
+			mygl.start = function(){
+				mygl.canvas = document.getElementById("glCanvas");
+				gl = mygl.canvas.getContext("experimental-webgl");
+				mygl.viewportWidth = mygl.canvas.width;
+				mygl.viewportHeight = mygl.canvas.height;
+			}
+			mygl.getShader = function(shaderId){
+				var shaderScript = document.getElementById(shaderId);
+				if(!shaderScript){
+					alert("Could not find "+shaderId+" Shader Script");
+					return null;
+				}
+				
+				var shader;
+				if(shaderScript.type == "x-shader/x-vertex"){
+					shader = gl.createShader(gl.VERTEX_SHADER);
+				}else if(shaderScript.type == "x-shader/x-fragment"){
+					shader = gl.createShader(gl.FRAGMENT_SHADER);
+				}else{
+					alert(shaderScript.type+" is not a Shader Type");
+					return null;
+				}
+
+				gl.shaderSource(shader, shaderScript.textContent);
+				gl.compileShader(shader);
+				if(!gl.getShaderParameter(shader, gl.COMPILE_STATUS)){
+					alert(gl.getShaderInfoLog(shader));
+					return null;
+				}
+
+				return shader;
+			}
+			mygl.startShader = function(){
+				mygl.vertexShader = mygl.getShader("shader-vs");
+				mygl.fragmentShader = mygl.getShader("shader-fs");
+
+				mygl.shaderProgram = gl.createProgram();
+				gl.attachShader(mygl.shaderProgram, mygl.vertexShader);
+				gl.attachShader(mygl.shaderProgram, mygl.fragmentShader);
+				gl.linkProgram(mygl.shaderProgram);
+				if(!gl.getProgramParameter(mygl.shaderProgram, gl.LINK_STATUS)){
+					alert("Could not link shaders");
+				}
+
+				gl.useProgram(mygl.shaderProgram);
+			}
+			mygl.createVBO = function(vertexArray, itemSize, numItems){
+				var VBO = gl.createBuffer();
+				gl.bindBuffer(gl.ARRAY_BUFFER, VBO);
+				gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertexArray), gl.STATIC_DRAW);
+				gl.bindBuffer(gl.ARRAY_BUFFER, null);
+				VBO.itemSize = itemSize;
+				VBO.numItems = numItems;
+				return VBO;
+			}
+			mygl.createIBO = function(indexArray){
+				var IBO = gl.createBuffer();
+				gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, IBO);
+				gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(indexArray), gl.STATIC_DRAW);
+				gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null);
+				return IBO;
+			}
+			mygl.associate = function(VBO, attributeName){
+				gl.bindBuffer(gl.ARRAY_BUFFER, VBO);
+				if(VBO.IBO!="undefined"){
+					gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, VBO.IBO);
+				}
+				var attribute = gl.getAttribLocation(mygl.shaderProgram, attributeName);
+				gl.vertexAttribPointer(attribute, VBO.itemSize, gl.FLOAT, false, 0, 0);
+				gl.enableVertexAttribArray(attribute);
+				return attribute;
+			}
+			mygl.drawSetup = function(){
+				gl.clearColor(mygl.background.r, mygl.background.g, mygl.background.b, mygl.background.a);
+				gl.enable(gl.DEPTH_TEST);
+				gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+				gl.viewport(0, 0, mygl.viewportWidth, mygl.viewportHeight);
+			}
+			mygl.setViewport = function(width, height){
+				mygl.viewportWidth = width;
+				mygl.viewportHeight = height;
+			}
+			mygl.setBackground = function(r, g, b, a){
+				mygl.background = {};
+				mygl.background.r = r;
+				mygl.background.g = g;
+				mygl.background.b = b;
+				mygl.background.a = a;
+			}
+		</script>
+		<script id="toolkit" type="text/javascript">
+			glArrayType=typeof Float32Array!="undefined"?Float32Array:typeof WebGLFloatArray!="undefined"?WebGLFloatArray:Array;
+
+			glIndexType=typeof Uint16Array!="undefined"?Uint16Array:typeof Array;
+
+			function toRadians(deegrees){
+				return deegrees * Math.PI / 180;
+			}
+
+			window.requestAnimFrame = (function() {
+				return window.requestAnimationFrame ||
+					window.webkitRequestAnimationFrame ||
+					window.mozRequestAnimationFrame ||
+					window.oRequestAnimationFrame ||
+					window.msRequestAnimationFrame ||
+					function(callback, element) {
+					window.setTimeout(callback, 1000/60);
+					};
+			})();
+		</script>
+		<script id="geometry" type="text/javascript">
+			circle={};
+			circle.createVertices = function(radius, vertexCount, isCircunference){
+				var theta = (360 / vertexCount);
+				var vertices;
+				if(isCircunference){
+					vertices = new glArrayType(2*vertexCount);
+					for(i = 0; 2*i < vertices.length; i++){
+						vertices[2*i] = radius*Math.cos(toRadians(i*theta));
+						vertices[2*i+1] = radius*Math.sin(toRadians(i*theta));
+					}
+				}
+				else{
+					vertices = new glArrayType(2*vertexCount+2);
+					vertices[0] = 0.0;
+					vertices[1] = 0.0;
+					for(i = 0; 2*i+2 < vertices.length; i++){
+						vertices[2*i+2] = radius*Math.cos(toRadians(i*theta));
+						vertices[2*i+3] = radius*Math.sin(toRadians(i*theta));
+					}
+				}
+				return vertices;
+			}
+			circle.createIndices = function(vertices, isCircunference){
+				var indices;
+				if(isCircunference){
+					indices = new Array((vertices.length-2)/2);
+					for(i=0; i<indices.length; i++){
+						indices[i] = i+1;
+					}
+				}
+				else{
+					indices = new Array((vertices.length-2)*3/2);
+					for(i = 0; i+1<indices.length/3; i++){
+						indices[3*i] = i+1;
+						indices[3*i+1] = 0;
+						indices[3*i+2] = i+2;
+					}
+					indices[indices.length-3] = i+1;
+					indices[indices.length-2] = 0;
+					indices[indices.length-1] = 1;
+				}
+				return indices;
+			}
+		</script>
+		<script id="shader-fs" type="x-shader/x-fragment">
+			precision mediump float;
+			varying vec3 vColor;
+			void main(void){
+				gl_FragColor = vec4(vColor, 1.0);
+			}
+
+		</script>
+		<script id="shader-vs" type="x-shader/x-vertex">
+			attribute vec2 aCoordinates;
+			varying vec3 vColor;
+			void main(void){
+				gl_Position = vec4(aCoordinates, 0.0, 1.0);
+				vColor = vec3(aCoordinates.x, 1.0,aCoordinates.y);
+			}
+
+		</script>
+		<script id="application" type="text/javascript">
+
+			function main(){
+				mygl.start();
+				mygl.startShader();
+
+				primary = {};
+				primary.vertices = circle.createVertices(1.0, 128, false);
+				primary.VBO = mygl.createVBO(primary.vertices, 2, primary.vertices/2);
+				primary.VBO.indices = circle.createIndices(primary.vertices, false);
+				primary.VBO.IBO = mygl.createIBO(primary.VBO.indices);
+				primary.VBO.attrib = mygl.associate(primary.VBO, "aCoordinates");
+
+				mygl.setBackground(0.5, 0.5, 0.5, 1.0);
+				mygl.drawSetup();
+				gl.drawElements(gl.TRIANGLES, primary.VBO.indices.length, gl.UNSIGNED_SHORT, 0);
+			}
+
+		</script>
+	</head>
+	<body onload="main();">
+		<canvas id="glCanvas" style="border: none;" width="500" height="500">
+	</body>
+</html>
