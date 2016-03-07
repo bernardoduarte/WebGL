@@ -186,13 +186,13 @@
 			circle.createIndices = function(vertices, isCircunference){
 				var indices;
 				if(isCircunference){
-					indices = new Array((vertices.length)/2);
+					indices = new glIndexType((vertices.length)/2);
 					for(var i = 0; i < indices.length; i++){
 						indices[i] = i;
 					}
 				}
 				else{
-					indices = new Array((vertices.length-2)*3/2);
+					indices = new glIndexType((vertices.length-2)*3/2);
 					for(var i = 0; i+1 < indices.length/3; i++){
 						indices[3*i] = i+1;
 						indices[3*i+1] = 0;
@@ -209,15 +209,15 @@
 			torus.createVertices = function(r1, r2, speedRatio, vertexCount){
 				var alpha = (360.0 / vertexCount);
 				var beta = speedRatio * alpha;
-				var vertices = new glArrayType(vertexCount);
+				var vertices = new glArrayType(2*vertexCount);
 				for(var i = 0; i < vertexCount; i++){
-					vertices[i] = r1*Math.cos(toRadians(i*alpha)) + r2*Math.cos(toRadians(i*beta));
-					vertices[i+1] = r1*Math.sin(toRadians(i*alpha)) + r2*Math.sin(toRadians(i*beta));
+					vertices[2*i] = r1*Math.cos(toRadians(i*alpha)) + r2*Math.cos(toRadians(i*beta));
+					vertices[2*i+1] = r1*Math.sin(toRadians(i*alpha)) + r2*Math.sin(toRadians(i*beta));
 				}
 				return vertices;
 			}
 			torus.createIndices = function(vertices){
-				var indices = new Array(vertices.length/2);
+				var indices = new glIndexType((vertices.length)/2);
 				for(var i = 0; i < indices.length; i++){
 					indices[i] = i;
 				}
@@ -278,7 +278,7 @@
 				gl.uniformMatrix4fv(myShaderProgram.location["scaleMatrix"], false, struct.scaleM);
 				gl.uniformMatrix4fv(myShaderProgram.location["rotationMatrix"], false, struct.rotM);
 				gl.uniformMatrix4fv(myShaderProgram.location["translationMatrix"], false, struct.transM);
-				struct.VBO.attrib = mygl.associate(struct.VBO, "aCoordinates");
+				mygl.associate(struct.VBO, "aCoordinates");
 				gl.drawElements(mode, struct.VBO.indices.length, gl.UNSIGNED_SHORT, 0);
 			}
 
@@ -302,9 +302,28 @@
 					0.0);
 			}
 
+			function createTrajectory(r1, r2, numArms, speedRatio, scale, rot, Tx, Ty, numVert){
+				var struct = {};
+				struct.r1 = r1;
+				struct.r2 = r2;
+				struct.scale = scale;
+				struct.rot = rot;
+				struct.Tx = Tx;
+				struct.Ty = Ty;
+				struct.scaleM = mat.createScale(scale, scale, 1.0);
+				struct.rotM = mat.createRotation(rot);
+				struct.transM = mat.createTranslation(Tx, Ty, 0.0);
+				struct.vertices = torus.createVertices(r1, r2, speedRatio*numArms+1, numVert);
+				struct.VBO = mygl.createVBO(struct.vertices, 2);
+				struct.VBO.indices = torus.createIndices(struct.vertices);
+				struct.VBO.IBO = mygl.createIBO(struct.VBO.indices);
+				return struct;
+			}
+
 			var lastTime = 0;
 			var rotAngle = 0;
 			var angularSpeed = 30;
+			var speedRatio = 2;
 
 			function animate(){
 				var timeNow = new Date().getTime();
@@ -357,7 +376,7 @@
 					midRing2[i] = createStruct(midCore[i].scale*5, rotAngle, tx1, ty1, numVertices, true);
 
 					var angleOffset = i * 360/numArms;
-					midArm[i] = createMidStruct(midRing2[i].scale, rotAngle, rotAngle*numArms*2+angleOffset, tx1, 0.0, ty1, 0.0, numMidArms, false);
+					midArm[i] = createMidStruct(midRing2[i].scale, rotAngle, rotAngle*numArms*speedRatio+angleOffset, tx1, 0.0, ty1, 0.0, numMidArms, false);
 
 					for(var j = 0; j < numMidArms; j++){
 						var tx2 = midArm[i].vertices[2*j+2]*midArm[i].scale;
@@ -376,11 +395,7 @@
 
 				}
 
-				trajectory = createStruct(1.0, 0.0, 0.0, 0.0, false);
-				trajectory.vertices = torus.createVertices(arms.vertices[2]*arms.scale, midArm[0].vertices[2]*midArm[0].scale, 1.0, 4);
-				trajectory.VBO = mygl.createVBO(trajectory.vertices, 1.0);
-				trajectory.VBO.indices = torus.createIndices(trajectory.vertices);
-				trajectory.VBO.IBO = mygl.createIBO(trajectory.vertices);
+				trajectory = createTrajectory(arms.vertices[2]*arms.scale, midArm[0].vertices[2]*midArm[0].scale, numArms, speedRatio, 1.0, 0.0, 0.0, 0.0, 1024);
 				drawStruct(trajectory, gl.LINE_LOOP);
 
 			}
@@ -408,6 +423,14 @@
 				if(numMidArms>1) numMidArms--;
 			}
 
+			function increaseSpeedRatio(){
+				if(speedRatio<7) speedRatio++;
+			}
+
+			function decreaseSpeedRatio(){
+				if(speedRatio>-7) speedRatio--;
+			}
+
 		</script>
 	</head>
 	<body onload="main();">
@@ -415,6 +438,9 @@
 		<button onClick="delArm()">Delete Arm</button>
 		<button onClick="addMidArm()">Add Secondary Arm</button>
 		<button onClick="delMidArm()">Delete Secondary Arm</button>
+		<br>
+		<button onClick="increaseSpeedRatio()">Increase Speed Ratio</button>
+		<button onClick="decreaseSpeedRatio()">Decrease Speed Ratio</button>
 		<br>
 		<canvas id="glCanvas" style="border: none;" width="500" height="500">
 	</body>
