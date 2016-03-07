@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<title>ImpaWebGL</title>
+		<script src="mygl.js" type="text/javascript">
+		
+		</script>
+		<script src="toolkit.js" type="text/javascript">
+
+		</script>
+		<script src="geometry.js" type="text/javascript">
+			
+		</script>
+		<script id="shader-fs" type="x-shader/x-fragment">
+			precision mediump float;
+			varying vec3 vColor;
+			void main(void){
+				gl_FragColor = vec4(vColor, 1.0);
+			}
+
+		</script>
+		<script id="shader-vs" type="x-shader/x-vertex">
+			attribute vec2 aCoordinates;
+
+			uniform mat4 translationMatrix;
+			uniform mat4 rotationMatrix;
+			uniform mat4 scaleMatrix;
+			uniform mat4 midTranslationMatrix;
+			uniform mat4 midRotationMatrix;
+
+			uniform float isMidStruct;
+
+			varying vec3 vColor;
+			void main(void){
+				vec4 pos = vec4(aCoordinates, 0.0, 1.0) * scaleMatrix;
+				if(isMidStruct==1.0){
+					pos = pos * midTranslationMatrix * midRotationMatrix;
+				}
+				pos = pos * translationMatrix * rotationMatrix;
+				gl_Position = pos;
+				vColor = vec3(0.5, aCoordinates.y/2.0+0.5, aCoordinates.x/2.0+0.5);
+				gl_PointSize = 2.0;
+			}
+
+		</script>
+		<script id="application" type="text/javascript">
+			
+			function createStruct(scale, rot, Tx, Ty, numVert, isRing){
+				var struct = {};
+				struct.scale = scale;
+				struct.rot = rot;
+				struct.Tx = Tx;
+				struct.Ty = Ty;
+				struct.scaleM = mat.createScale(scale, scale, 1.0);
+				struct.rotM = mat.createRotation(rot);
+				struct.transM = mat.createTranslation(Tx, Ty, 0.0);
+				struct.vertices = circle.createVertices(1.0, numVert, isRing);
+				struct.VBO = mygl.createVBO(struct.vertices, 2);
+				struct.VBO.indices = circle.createIndices(struct.vertices, isRing);
+				struct.VBO.IBO = mygl.createIBO(struct.VBO.indices);
+				return struct;
+			}
+
+			function drawStruct(struct, mode){
+				gl.uniformMatrix4fv(myShaderProgram.location["scaleMatrix"], false, struct.scaleM);
+				gl.uniformMatrix4fv(myShaderProgram.location["rotationMatrix"], false, struct.rotM);
+				gl.uniformMatrix4fv(myShaderProgram.location["translationMatrix"], false, struct.transM);
+				mygl.associate(struct.VBO, "aCoordinates");
+				gl.drawElements(mode, struct.VBO.indices.length, gl.UNSIGNED_SHORT, 0);
+			}
+
+			function createMidStruct(scale, rot1, rot2, Tx1, Tx2, Ty1, Ty2, numVert, isRing){
+				var midStruct = {};
+				midStruct = createStruct(scale, rot1, Tx1, Ty1, numVert, isRing);
+				midStruct.rot2 = rot2;
+				midStruct.Tx2 = Tx2;
+				midStruct.Ty2 = Ty2;
+				midStruct.midRotM = mat.createRotation(rot2);
+				midStruct.midTransM = mat.createTranslation(Tx2, Ty2, 0.0);
+				return midStruct;
+			}
+
+			function drawMidStruct(struct, mode){
+				gl.uniformMatrix4fv(myShaderProgram.location["midTranslationMatrix"], false, struct.midTransM);
+				gl.uniformMatrix4fv(myShaderProgram.location["midRotationMatrix"], false, struct.midRotM);
+				gl.uniform1f(myShaderProgram.location["isMidStruct"], 1.0);
+				drawStruct(struct, mode);
+				gl.uniform1f(myShaderProgram.location["isMidStruct"], 
+					0.0);
+			}
+
+			function createTrajectory(r1, r2, numArms, speedRatio, scale, rot, Tx, Ty, numVert){
+				var struct = {};
+				struct.r1 = r1;
+				struct.r2 = r2;
+				struct.scale = scale;
+				struct.rot = rot;
+				struct.Tx = Tx;
+				struct.Ty = Ty;
+				struct.scaleM = mat.createScale(scale, scale, 1.0);
+				struct.rotM = mat.createRotation(rot);
+				struct.transM = mat.createTranslation(Tx, Ty, 0.0);
+				struct.vertices = torus.createVertices(r1, r2, speedRatio*numArms+1, numVert);
+				struct.VBO = mygl.createVBO(struct.vertices, 2);
+				struct.VBO.indices = torus.createIndices(struct.vertices);
+				struct.VBO.IBO = mygl.createIBO(struct.VBO.indices);
+				return struct;
+			}
+
+			var lastTime = 0;
+			var rotAngle = 0;
+			var angularSpeed = 30;
+			var speedRatio = 2;
+
+			function animate(){
+				var timeNow = new Date().getTime();
+				if(lastTime!=0){
+					var elapsed = timeNow - lastTime;
+
+					rotAngle += angularSpeed*elapsed/1000.0;  
+				}
+				lastTime = timeNow;
+			}
+
+			function tick(){
+				requestAnimFrame(tick);
+				drawScene();
+				animate();
+			}
+
+			var numArms = 3;
+			var numMidArms = 1;
+
+			function drawScene(){
+				mygl.setBackground(0.1, 0.1, 0.1, 1.0);
+				mygl.drawSetup();
+
+				numVertices = 32;
+
+				core = createStruct(0.08, rotAngle, 0.0, 0.0, numVertices, false);
+				drawStruct(core, gl.TRIANGLES);
+
+				arms = createStruct(core.scale*7, rotAngle, core.Tx, core.Ty, numArms, false);
+				drawStruct(arms, gl.LINE_STRIP);
+
+				ring = createStruct(core.scale*3/2, rotAngle, core.Tx, core.Ty, numVertices, true);
+				drawStruct(ring, gl.LINE_LOOP);
+
+				dotRing = createStruct(arms.scale, -rotAngle, core.Tx, core.Ty, numVertices*2, true);
+				drawStruct(dotRing, gl.POINTS);
+
+				midCore = [];
+				midRing1 = [];
+				midRing2 = [];
+				midArm = [];
+				finalCore = [];
+				finalRing = [];
+				for(var i = 0; i < numArms; i++){
+					var tx1 = arms.vertices[2*i+2]*arms.scale + arms.Tx;
+					var ty1 = arms.vertices[2*i+3]*arms.scale + arms.Ty;
+					midCore[i] = createStruct(core.scale/2, rotAngle, tx1, ty1, numVertices, false);
+					midRing1[i] = createStruct(midCore[i].scale*3/2, rotAngle, tx1, ty1, numVertices, true);
+					midRing2[i] = createStruct(midCore[i].scale*5, rotAngle, tx1, ty1, numVertices, true);
+
+					var angleOffset = i * 360/numArms;
+					midArm[i] = createMidStruct(midRing2[i].scale, rotAngle, rotAngle*numArms*speedRatio+angleOffset, tx1, 0.0, ty1, 0.0, numMidArms, false);
+
+					for(var j = 0; j < numMidArms; j++){
+						var tx2 = midArm[i].vertices[2*j+2]*midArm[i].scale;
+						var ty2 = midArm[i].vertices[2*j+3]*midArm[i].scale;
+						finalCore[j] = createMidStruct(midCore[i].scale/2, rotAngle, midArm[i].rot2, tx1, tx2, ty1, ty2, numVertices, false);
+						finalRing[j] = createMidStruct(finalCore[j].scale*3/2, rotAngle, midArm[i].rot2, tx1, tx2, ty1, ty2, numVertices, true);
+
+						drawMidStruct(finalCore[j], gl.TRIANGLES);
+						drawMidStruct(finalRing[j], gl.LINE_LOOP);
+					}
+
+					drawStruct(midCore[i], gl.TRIANGLES);
+					drawStruct(midRing1[i], gl.LINE_LOOP);
+					drawStruct(midRing2[i], gl.LINE_LOOP);
+					drawMidStruct(midArm[i], gl.LINE_STRIP);
+
+				}
+
+				trajectory = createTrajectory(arms.vertices[2]*arms.scale, midArm[0].vertices[2]*midArm[0].scale, numArms, speedRatio, 1.0, 0.0, 0.0, 0.0, 1024);
+				drawStruct(trajectory, gl.LINE_LOOP);
+
+			}
+
+			function main(){
+				mygl.start();
+				mygl.startShader();
+
+				tick();
+			}
+
+			function addArm(){
+				if(numArms<7) numArms++;
+			}
+
+			function delArm(){
+				if(numArms>1) numArms--;
+			}
+
+			function addMidArm(){
+				if(numMidArms<5) numMidArms++;
+			}
+
+			function delMidArm(){
+				if(numMidArms>1) numMidArms--;
+			}
+
+			function increaseSpeedRatio(){
+				if(speedRatio<7) speedRatio++;
+			}
+
+			function decreaseSpeedRatio(){
+				if(speedRatio>-7) speedRatio--;
+			}
+
+		</script>
+	</head>
+	<body onload="main();">
+		<button onClick="addArm()">Add Arm</button>
+		<button onClick="delArm()">Delete Arm</button>
+		<button onClick="addMidArm()">Add Secondary Arm</button>
+		<button onClick="delMidArm()">Delete Secondary Arm</button>
+		<br>
+		<button onClick="increaseSpeedRatio()">Increase Speed Ratio</button>
+		<button onClick="decreaseSpeedRatio()">Decrease Speed Ratio</button>
+		<br>
+		<canvas id="glCanvas" style="border: none;" width="500" height="500">
+	</body>
+</html>
